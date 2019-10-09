@@ -10,6 +10,7 @@ __email__      = "anne.bouillard@nokia-bell-labs.com"
 __copyright__  = "Copyright (C) 2019, Nokia"
 __license__    = "BSD-3"
 
+
 from NCBounds.ServiceCurve import ServiceCurve, deconvolution, residual_blind
 from NCBounds.ArrivalCurve import ArrivalCurve, ac_sub, ac_sum
 

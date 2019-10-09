@@ -113,6 +113,7 @@ class SFAFeedForwardAnalyzer(FeedForwardAnalyzer):
         sc = ServiceCurve(np.inf, 0)
         tab_ac, tab_sc = self.sfa_blind
         for h in self.network.flows[flow].path:
+            print(h)
             sc = convolution(sc, tab_sc[flow * self.network.num_servers + h])
         return delay(self.network.flows[flow].acurve, sc)
 
@@ -304,3 +305,12 @@ class ExactFeedForwardAnalyzer(FeedForwardAnalyzer):
                          tnet.flows[i].acurve.sigma
         b += self.latency_term([flow], server, xi)
         return b
+
+    def delay(self, flow):
+        start = self.network.flows[flow].path[0]
+        end = self.network.flows[flow].path[-1]
+        tnet = self.network.trim(end)
+        ffa = ExactFeedForwardAnalyzer(tnet)
+        xi = ffa.exact_xi([flow], end)
+        bkl = self.backlog(flow, end)
+        return (bkl - self.network.flows[flow].acurve.sigma * (1 - xi[start, end])) / self.network.flows[flow].acurve.rho

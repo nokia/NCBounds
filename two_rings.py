@@ -12,6 +12,7 @@ n =5
 R = 100
 u = 0.3
 d = np.inf
+T = 0.001
 
 two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, 1)), Server(ServiceCurve(2 * n, 1)))
 
@@ -52,8 +53,8 @@ print("\n\t*Linear-arc method: the network is decomposed into a tree, and an arr
 group = GroupFixPointAnalyzer(two_ring)
 
 print(group.ff_equiv)
-print(group.ff_equiv_bis)
-print(group.backlog_bis(0, 2*(n-1)))
+#print(group.ff_equiv_bis)
+#print(group.backlog_bis(0, 2*(n-1)))
 
 
 print("\n\t*Linear method: the network is decomposed into a tree, and an arrival curve is computed for each arc that has been removed and each sub-path of the flows")
@@ -66,24 +67,36 @@ linear = LinearFixPointAnalyzer(two_ring)
 print("\n\nComparing the approaches")
 
 k = 2* (n-1)
-# f = open('./two_ring_3.data', 'w')
-# #f.write("# u\t SFA\t Exact\t Group \t Comby\n")
-# two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, 1)), Server(ServiceCurve(2 * n, 1)))
-# u = 0.01
-# lin = 0
+f = open('./two_ring_delay_3.data', 'w')
+#f.write("# u\t SFA\t Exact\t Group \t Comby\n")
+two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, T)), Server(ServiceCurve(2 * n, T)))
+u = 0.01
+lin = 0
+while u < 1 and lin < 50000.:
+    two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, T)), Server(ServiceCurve(2 * n, T)))
+    f.write("%f\t" % u)
+    f.write("%f\t" % SFAFixPointAnalyzer(two_ring).delay(0))
+    f.write("%f\t" % ExactFixPointAnalyzer(two_ring).delay(0))
+    f.write("%f\t" % GroupFixPointAnalyzer(two_ring).delay(0))
+    lin = LinearFixPointAnalyzer(two_ring).delay(0)
+    f.write("%f\n" % lin)
+    print(u)
+    u += 0.01
+f.close()
+
 # while u < 1 and lin < 50000.:
-#     two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, 1)), Server(ServiceCurve(2 * n, 1)))
+#     two_ring = TwoRings(n, ArrivalCurve(1, u), Server(ServiceCurve(n, T)), Server(ServiceCurve(2 * n, T)))
 #     f.write("%f\t" % u)
-#     f.write("%f\t" % SFAFixPointAnalyzer(two_ring).backlog(0, k))
-#     f.write("%f\t" % ExactFixPointAnalyzer(two_ring).backlog(0, k))
-#     f.write("%f\t" % GroupFixPointAnalyzer(two_ring).backlog_bis(0, k))
-#     lin = LinearFixPointAnalyzer(two_ring).backlog(0, k)
+#     f.write("%f\t" % SFAFixPointAnalyzer(two_ring).backlog(0, 2*(n-1 )))
+#     f.write("%f\t" % ExactFixPointAnalyzer(two_ring).backlog(0, 2*(n-1 )))
+#     f.write("%f\t" % GroupFixPointAnalyzer(two_ring).backlog(0, 2*(n-1 )))
+#     lin = LinearFixPointAnalyzer(two_ring).backlog(0, 2*(n-1 ))
 #     f.write("%f\n" % lin)
 #     print(u)
 #     u += 0.01
 # f.close()
 
-with open('./two_ring_3.data') as f:
+with open('./two_ring_delay_3.data') as f:
     lines = f.readlines()
     u = [float(line.split()[0]) for line in lines]
     sfa = [float(line.split()[1]) for line in lines]

@@ -223,6 +223,31 @@ class SFAFixPointAnalyzer(FixPointAnalyzer):
         f = self._flow_decomp(flow, server)
         return SFAFeedForwardAnalyzer(self.ff_equiv).backlog(f, server)
 
+    def delay(self, flow):
+        """
+        Computes a delay bound of a flow at a server based on the SFA analysis.
+
+        :param flow: flow for which thedelay is computed
+        :type flow: int
+        :return: the delay of flow
+        :rtype: float
+        """
+        ffnet = SFAFeedForwardAnalyzer(self.ff_equiv)
+        tab_ac, tab_sc = ffnet.sfa_blind
+        i = 0
+        f = 0
+        while i < flow:
+            f += self.network.flows[i].length
+            i += 1
+        sc = ServiceCurve(np.inf, 0)
+        for i in range(len(self.network.flows[flow].path)):
+            sc = convolution(sc,
+                             tab_sc[self.network.flows[flow].path[i] +
+                                    (f + i) * self.network.num_servers])
+        #server = self.network.flows[flow].path[-1]
+        #f = self._flow_decomp(flow, server)
+        #return SFAFeedForwardAnalyzer(self.ff_equiv).delay(f)
+        return delay(self.network.flows[flow].acurve, sc)
 
 class ExactFixPointAnalyzer(FixPointAnalyzer):
     @property
@@ -389,6 +414,23 @@ class ExactFixPointAnalyzer(FixPointAnalyzer):
         # print(f)
         return ExactFeedForwardAnalyzer(self.ff_equiv).backlog(f, server)
 
+    def delay(self, flow):
+        """
+        Computes a delay bound of a flow based on the exact analysis.
+        WARNING: only for flows not cut into several subflows -> TODO
+
+        :param flow: flow for which the delay is computed
+        :type flow: int
+        :return: the delay of flow
+        :rtype: float
+         """
+        server = self.network.flows[flow].path[-1]
+        f = self._flow_decomp(flow, server)
+        # print(f)
+        # print(ExactFeedForwardAnalyzer(self.ff_equiv).network)
+        # print(f)
+        return ExactFeedForwardAnalyzer(self.ff_equiv).delay(f)
+
 
 class GroupFixPointAnalyzer(ExactFixPointAnalyzer):
     @property
@@ -454,6 +496,8 @@ class GroupFixPointAnalyzer(ExactFixPointAnalyzer):
         forest, list_prems = self.nk2forest
         redges = self._removed_edges
         rlist = self.foi_group
+        #print(rlist)
+        #print(list_prems)
         s = len(redges)
         mat_a = np.zeros((s, s))
         vec_b = np.zeros(s)
@@ -464,11 +508,18 @@ class GroupFixPointAnalyzer(ExactFixPointAnalyzer):
             # print(xi)
             mat_a[h, h] = 1
             for e in range(s):
-                mat_a[h, e] -= max([0] + [xi[tforest.flows[f + 1].path[0], tforest.flows[f + 1].path[-1]]
+                mat_a[h, e] -= max([0] + [xi[tforest.flows[f + 1].path[0],
+                                             tforest.flows[f + 1].path[-1]]
                                           for f in rlist[e]])
-                vec_b[h] = sum([xi[tforest.flows[f].path[0], tforest.flows[f].path[-1]] * tforest.flows[f].acurve.sigma
-                                for f in list_prems if not tforest.flows[f].path == []])
+                vec_b[h] = sum([xi[tforest.flows[f].path[0], tforest.flows[f].path[-1]]
+                                * tforest.flows[f].acurve.sigma
+                                for f in list_prems if not tforest.flows[f].path == []
+                                and f not in rlist[h]])
+                vec_b[h] += sum([tforest.flows[f].acurve.sigma
+                                for f in list_prems if not tforest.flows[f].path == []
+                                and f in rlist[h]])
                 vec_b += ffa.latency_term(rlist[h], redges[h][0], xi)
+            #print(mat_a, vec_b)
         return mat_a, vec_b
 
     @property
@@ -486,9 +537,9 @@ class GroupFixPointAnalyzer(ExactFixPointAnalyzer):
         Flows:
               0:α(t) = 2.00 + 1.00 t; π = [0, 1, 2]
               1:α(t) = 2.00 + 1.00 t; π = [1, 2]
-              2:α(t) = 25.00 + 1.00 t; π = [0]
+              2:α(t) = 30.53 + 1.00 t; π = [0]
               3:α(t) = 2.00 + 1.00 t; π = [2]
-              4:α(t) = 25.00 + 1.00 t; π = [0, 1]
+              4:α(t) = 30.53 + 1.00 t; π = [0, 1]
         Servers:
               0:β(t) = 6.00 . (t - 4.00)+
               1:β(t) = 6.00 . (t - 4.00)+
@@ -530,6 +581,23 @@ class GroupFixPointAnalyzer(ExactFixPointAnalyzer):
         """
         f = self._flow_decomp(flow, server)
         return ExactFeedForwardAnalyzer(self.ff_equiv).backlog(f, server)
+
+    def delay(self, flow):
+        """
+        Computes a delay bound of a flow based on the exact analysis.
+        WARNING: only for flows not cut into several subflows -> TODO
+
+        :param flow: flow for which the delay is computed
+        :type flow: int
+        :return: the delay of flow
+        :rtype: float
+         """
+        server = self.network.flows[flow].path[-1]
+        f = self._flow_decomp(flow, server)
+        #print(ExactFeedForwardAnalyzer(self.ff_equiv).network)
+        # print(f)
+        return ExactFeedForwardAnalyzer(self.ff_equiv).delay(f)
+
 
 
 class LinearFixPointAnalyzer(GroupFixPointAnalyzer):
@@ -656,3 +724,29 @@ class LinearFixPointAnalyzer(GroupFixPointAnalyzer):
         else:
             bkl = np.inf
         return bkl
+
+    def delay(self, flow):
+        server = self.network.flows[flow].path[-1]
+        start = self.network.flows[flow].path[0]
+        mat_a, vec_b = self.the_big_matrix_and_vector()
+        n1, n2 = np.shape(mat_a)
+        tforest = self.nk2forest[0].trim(server)
+        tfa = ExactFeedForwardAnalyzer(tforest)
+        c = np.zeros(n2)
+        f = self._flow_decomp(flow, server)
+        xi = tfa.exact_xi([f], server)
+        s = len(tforest.flows)
+        for i in range(s):
+            if i == f:
+                c[i] = -1
+            else:
+                if not tforest.flows[i].path == []:
+                    c[i] = -xi[tfa.network.flows[i].path[0], tfa.network.flows[i].path[-1]]
+        linear = linprog(c, mat_a, vec_b, options={'tol':1e-7})
+        if linear.success == True:
+            bkl = -linear.fun
+            bkl += tfa.latency_term([f], server, xi)
+        else:
+            bkl = np.inf
+            return np.inf
+        return (bkl - self.network.flows[flow].acurve.sigma * (1 - xi[start, server])) / self.network.flows[flow].acurve.rho
