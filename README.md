@@ -1,5 +1,7 @@
 # NCBounds
 
+*Note:* NCBounds is no longer actively maintained.
+
 NCBounds is a Python module able to compute worst-case performances upper bounds in the Network Calculus framework. 
 
 ## Hypothesis: 
