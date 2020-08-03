@@ -15,3 +15,8 @@ NCBounds is a Python module able to compute worst-case performances upper bounds
 
 ## Installation:
 ``` sudo python3 ./setup.py install```
+
+
+## License
+
+This project is licensed under the BSD-3-Clause license - see the [LICENSE](https://github.com/nokia/NCBounds/blob/master/LICENSE).
